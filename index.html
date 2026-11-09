@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>사회시간 타이머</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Noto Sans KR & Montserrat) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            touch-action: manipulation;
+            user-select: none;
+            transition: background-color 0.8s ease, color 0.5s ease;
+        }
+
+        .timer-font {
+            font-family: 'Montserrat', sans-serif;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* 신호등 배경 테마 */
+        .theme-green {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #ffffff;
+        }
+        .theme-yellow {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: #ffffff;
+        }
+        .theme-red {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: #ffffff;
+        }
+        .theme-finish {
+            background: linear-gradient(135deg, #4b5563 0%, #1f2937 100%);
+            color: #ffffff;
+        }
+
+        /* 덜덜 떠는 모션 (긴박함) */
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            20% { transform: translate(-3px, 2px) rotate(-2deg); }
+            40% { transform: translate(3px, -1px) rotate(2deg); }
+            60% { transform: translate(-2px, -2px) rotate(-1deg); }
+            80% { transform: translate(2px, 1px) rotate(1deg); }
+        }
+        .animate-shake {
+            animation: shake 0.3s infinite ease-in-out;
+        }
+
+        /* 시간 종료 펄쩍 뛰기 애니메이션 */
+        @keyframes bounce-jump {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-25px) scale(1.1); }
+        }
+        .animate-jump {
+            animation: bounce-jump 0.6s infinite ease-in-out;
+        }
+
+        /* 화면 깜빡임 (Flash effect) */
+        @keyframes flash-screen {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .flash-bg {
+            animation: flash-screen 0.6s infinite;
+        }
+
+        /* 버튼 입체감 shadow */
+        .btn-push {
+            transition: all 0.1s ease;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.2);
+        }
+        .btn-push:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 rgba(0,0,0,0.2);
+        }
+
+        /* 프로그래스 바 애니메이션 */
+        .progress-bar-inner {
+            transition: width 0.5s linear;
+        }
+    </style>
+</head>
+<body class="theme-green min-h-screen flex flex-col justify-between p-4 md:p-8 overflow-hidden select-none">
+
+    <!-- Header: 제목 & 현재 시간 -->
+    <header class="flex justify-between items-center w-full max-w-6xl mx-auto border-b-2 border-white/30 pb-4">
+        <div class="flex items-center space-x-3">
+            <span class="text-3xl md:text-5xl">🌍</span>
+            <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight drop-shadow-md">사회시간 타이머</h1>
+        </div>
+        <div class="text-right">
+            <div id="current-time" class="text-lg md:text-2xl font-bold bg-black/20 px-4 py-2 rounded-xl backdrop-blur-sm">
+                00:00:00
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content: 캐릭터 & 대형 디지털 시계 -->
+    <main class="flex-1 flex flex-col items-center justify-center max-w-5xl mx-auto w-full my-4">
+        
+        <!-- 마스코트 캐릭터 (판다 SVG) -->
+        <div id="character-container" class="mb-4 transform transition-all duration-300">
+            <svg id="panda-svg" width="200" height="200" viewBox="0 0 200 200" class="drop-shadow-2xl overflow-visible">
+                <!-- 판다 귀 (더 동글동글하고 아기자기함) -->
+                <circle cx="42" cy="48" r="26" fill="#1e293b"/>
+                <circle cx="42" cy="48" r="15" fill="#e2e8f0" opacity="0.15"/>
+                <circle cx="158" cy="48" r="26" fill="#1e293b"/>
+                <circle cx="158" cy="48" r="15" fill="#e2e8f0" opacity="0.15"/>
+                
+                <!-- 판다 몸통 & 작은 아기 손 -->
+                <ellipse cx="100" cy="165" rx="55" ry="30" fill="#1e293b"/>
+                <!-- 아기 판다 발바닥/손 -->
+                <ellipse cx="55" cy="155" rx="14" ry="10" fill="#ffffff" stroke="#1e293b" stroke-width="4" transform="rotate(-20 55 155)"/>
+                <ellipse cx="145" cy="155" rx="14" ry="10" fill="#ffffff" stroke="#1e293b" stroke-width="4" transform="rotate(20 145 155)"/>
+
+                <!-- 판다 얼굴 (모찌모찌한 둥근 통통 형태) -->
+                <ellipse cx="100" cy="112" rx="72" ry="62" fill="#ffffff" stroke="#1e293b" stroke-width="5"/>
+                
+                <!-- 판다 귀여운 눈가 패치 (경사진 동글 형태) -->
+                <ellipse cx="66" cy="104" rx="20" ry="25" fill="#1e293b" transform="rotate(-12 66 104)"/>
+                <ellipse cx="134" cy="104" rx="20" ry="25" fill="#1e293b" transform="rotate(12 134 104)"/>
+
+                <!-- 빵빵한 주둥이 & 앙증맞은 코 -->
+                <ellipse cx="100" cy="126" rx="20" ry="13" fill="#f8fafc"/>
+                <ellipse cx="100" cy="120" rx="9" ry="6" fill="#1e293b"/>
+                
+                <!-- 촉촉한 인중 선 -->
+                <path d="M 100 126 L 100 129" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>
+
+                <!-- 모찌 볼터치 (달콤한 핑크) -->
+                <ellipse cx="46" cy="126" rx="12" ry="8" fill="#ff7675" opacity="0.6"/>
+                <ellipse cx="154" cy="126" rx="12" ry="8" fill="#ff7675" opacity="0.6"/>
+
+                <!-- ===== [Dynamic Eyes: 상태별 눈 표현] ===== -->
+                <!-- 1. 초록 테마: 여유롭고 하트 뿅뿅 / 반짝이는 아기 눈 -->
+                <g id="eyes-happy">
+                    <!-- 왼쪽 눈 (하트 또는 반짝이는 큰 눈) -->
+                    <circle cx="66" cy="102" r="8" fill="#ffffff"/>
+                    <circle cx="66" cy="102" r="6" fill="#000000"/>
+                    <circle cx="64" cy="99" r="2.5" fill="#ffffff"/>
+                    <circle cx="68" cy="104" r="1" fill="#ffffff"/>
+                    <!-- 오른쪽 눈 -->
+                    <circle cx="134" cy="102" r="8" fill="#ffffff"/>
+                    <circle cx="134" cy="102" r="6" fill="#000000"/>
+                    <circle cx="132" cy="99" r="2.5" fill="#ffffff"/>
+                    <circle cx="136" cy="104" r="1" fill="#ffffff"/>
+                    <!-- 머리 위 귀여운 미니 하트 -->
+                    <path d="M 100 38 Q 96 32 92 38 Q 92 44 100 50 Q 108 44 108 38 Q 104 32 100 38 Z" fill="#ff7675" opacity="0.85"/>
+                </g>
+
+                <!-- 2. 노랑 테마: 동공지진 & 초조함 -->
+                <g id="eyes-nervous" class="hidden">
+                    <circle cx="66" cy="102" r="9" fill="#ffffff"/>
+                    <circle cx="134" cy="102" r="9" fill="#ffffff"/>
+                    <circle cx="66" cy="102" r="4" fill="#1e293b"/>
+                    <circle cx="134" cy="102" r="4" fill="#1e293b"/>
+                    <circle cx="65" cy="100" r="1.5" fill="#ffffff"/>
+                    <circle cx="133" cy="100" r="1.5" fill="#ffffff"/>
+                </g>
+
+                <!-- 3. 빨강 테마: 울먹울먹 긴박함 -->
+                <g id="eyes-panicked" class="hidden">
+                    <!-- 섭섭한 큰 눈망울과 눈물 고임 -->
+                    <ellipse cx="66" cy="102" rx="10" ry="12" fill="#ffffff"/>
+                    <ellipse cx="134" cy="102" rx="10" ry="12" fill="#ffffff"/>
+                    <circle cx="66" cy="104" r="4" fill="#1e293b"/>
+                    <circle cx="134" cy="104" r="4" fill="#1e293b"/>
+                    <circle cx="68" cy="99" r="3" fill="#ffffff"/>
+                    <circle cx="136" cy="99" r="3" fill="#ffffff"/>
+                    <!-- 눈썹 억울함 -->
+                    <path d="M 58 86 Q 66 90 74 88" stroke="#1e293b" stroke-width="3" fill="none" stroke-linecap="round"/>
+                    <path d="M 126 88 Q 134 90 142 86" stroke="#1e293b" stroke-width="3" fill="none" stroke-linecap="round"/>
+                </g>
+
+                <!-- 4. 종료 상태: 뱅뱅이 기절 눈 -->
+                <g id="eyes-dead" class="hidden">
+                    <path d="M 58 102 Q 66 94 74 102 Q 66 110 58 102" stroke="#ffffff" stroke-width="3.5" fill="none"/>
+                    <path d="M 126 102 Q 134 94 142 102 Q 134 110 126 102" stroke="#ffffff" stroke-width="3.5" fill="none"/>
+                </g>
+
+                <!-- ===== [Dynamic Mouth: 입 표현] ===== -->
+                <!-- 행복한 시옷 입 -->
+                <path id="mouth-happy" d="M 91 130 Q 95 136 100 130 Q 105 136 109 130" stroke="#1e293b" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+                <!-- 초조한 일자 입 -->
+                <path id="mouth-nervous" d="M 93 133 Q 100 130 107 133" stroke="#1e293b" stroke-width="3.5" fill="none" stroke-linecap="round" class="hidden"/>
+                <!-- 당황해서 벌린 작은 입 -->
+                <ellipse id="mouth-panicked" cx="100" cy="135" rx="5" ry="7" fill="#ff7675" stroke="#1e293b" stroke-width="2.5" class="hidden"/>
+                <!-- 종료 시 혀 뺀 입 -->
+                <g id="mouth-dead" class="hidden">
+                    <ellipse cx="100" cy="133" rx="7" ry="8" fill="#1e293b"/>
+                    <path d="M 97 136 Q 100 141 103 136" fill="#ff7675"/>
+                </g>
+
+                <!-- ===== [Sweat & Tears: 땀방울과 눈물] ===== -->
+                <g id="sweat-small" class="hidden">
+                    <!-- 작은 귀여운 땀방울 -->
+                    <path d="M 162 76 Q 167 86 162 90 Q 157 86 162 76 Z" fill="#70a1ff"/>
+                </g>
+                <g id="sweat-large" class="hidden">
+                    <!-- 뚝뚝 떨어지는 눈물/땀 -->
+                    <path d="M 166 70 Q 173 83 166 90 Q 159 83 166 70 Z" fill="#70a1ff"/>
+                    <path d="M 34 76 Q 41 87 34 93 Q 27 87 34 76 Z" fill="#70a1ff"/>
+                    <!-- 주르륵 주황/파란 눈물 폭포 방울 -->
+                    <circle cx="58" cy="115" r="4" fill="#70a1ff" opacity="0.8"/>
+                    <circle cx="142" cy="115" r="4" fill="#70a1ff" opacity="0.8"/>
+                </g>
+            </svg>
+        </div>
+
+        <!-- 타이머 수치 Display -->
+        <div class="relative w-full text-center my-2">
+            <div id="timer-display" class="timer-font text-7xl sm:text-8xl md:text-9xl lg:text-[11rem] font-black tracking-tight leading-none drop-shadow-lg cursor-pointer select-none">
+                05:00
+            </div>
+            
+            <!-- 시간 상태 안내 메시지 -->
+            <div id="status-badge" class="mt-2 text-xl sm:text-2xl font-bold bg-black/25 px-6 py-2 rounded-full inline-block backdrop-blur-md shadow-inner">
+                🌱 차분하게 모둠 활동을 시작해 보세요!
+            </div>
+        </div>
+
+        <!-- 진행률 Bar -->
+        <div class="w-full max-w-3xl bg-black/30 h-5 sm:h-6 rounded-full overflow-hidden p-1 mt-4 shadow-inner">
+            <div id="progress-bar" class="progress-bar-inner bg-white h-full rounded-full w-full shadow-md"></div>
+        </div>
+    </main>
+
+    <!-- Controls & Presets Section -->
+    <footer class="w-full max-w-5xl mx-auto flex flex-col gap-4">
+        
+        <!-- 퀵 시간 설정 버튼 모음 (1분, 3분, 5분, 10분, 15분, 20분, 30분) -->
+        <div class="grid grid-cols-4 sm:grid-cols-7 gap-2">
+            <button onclick="setPresetTime(60)" class="btn-push bg-white/20 hover:bg-white/30 text-white font-extrabold text-base sm:text-xl py-3 rounded-2xl backdrop-blur-md border border-white/40">
+                1분
+            </button>
+            <button onclick="setPresetTime(180)" class="btn-push bg-white/20 hover:bg-white/30 text-white font-extrabold text-base sm:text-xl py-3 rounded-2xl backdrop-blur-md border border-white/40">
+                3분
+            </button>
+            <button onclick="setPresetTime(300)" class="btn-push bg-white/20 hover:bg-white/30 text-white font-extrabold text-base sm:text-xl py-3 rounded-2xl backdrop-blur-md border border-white/40">
+                5분
+            </button>
+            <button onclick="setPresetTime(600)" class="btn-push bg-white/20 hover:bg-white/30 text-white font-extrabold text-base sm:text-xl py-3 rounded-2xl backdrop-blur-md border border-white/40">
+                10분
+            </button>
+            <button onclick="setPresetTime(900)" class="btn-push bg-white/20 hover:bg-white/30 text-white font-extrabold text-base sm:text-xl py-3 rounded-2xl backdrop-blur-md border border-white/40">
+                15분
+            </button>
+            <button onclick="setPresetTime(1200)" class="btn-push bg-white/20 hover:bg-white/30 text-white font-extrabold text-base sm:text-xl py-3 rounded-2xl backdrop-blur-md border border-white/40">
+                20분
+            </button>
+            <button onclick="setPresetTime(1800)" class="btn-push bg-white/20 hover:bg-white/30 text-white font-extrabold text-base sm:text-xl py-3 rounded-2xl backdrop-blur-md border border-white/40 col-span-4 sm:col-span-1">
+                30분
+            </button>
+        </div>
+
+        <!-- 제어 버튼 (시작/일시정지, 초기화, 미세조정) -->
+        <div class="grid grid-cols-12 gap-2 sm:gap-4">
+            <!-- 미세 조정: -1분 -->
+            <button onclick="addTime(-60)" class="col-span-2 btn-push bg-black/20 hover:bg-black/30 text-white font-bold text-base sm:text-xl py-4 rounded-2xl border border-white/20 flex items-center justify-center">
+                -1분
+            </button>
+            <!-- 미세 조정: +10초 -->
+            <button onclick="addTime(10)" class="col-span-2 btn-push bg-black/20 hover:bg-black/30 text-white font-bold text-base sm:text-xl py-4 rounded-2xl border border-white/20 flex items-center justify-center">
+                +10초
+            </button>
+
+            <!-- 메인 시작/일시정지 버튼 -->
+            <button id="start-btn" onclick="toggleTimer()" class="col-span-5 btn-push bg-white text-emerald-800 hover:bg-emerald-50 font-black text-2xl sm:text-4xl py-4 rounded-2xl shadow-xl flex items-center justify-center gap-2">
+                <span id="start-btn-icon">▶</span>
+                <span id="start-btn-text">시작</span>
+            </button>
+
+            <!-- 리셋 버튼 -->
+            <button onclick="resetTimer()" class="col-span-3 btn-push bg-red-600/80 hover:bg-red-600 text-white font-bold text-xl sm:text-2xl py-4 rounded-2xl border border-white/30 flex items-center justify-center">
+                🔄 초기화
+            </button>
+        </div>
+    </footer>
+
+    <!-- 시간 종료 모달 팝업 -->
+    <div id="finish-modal" class="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white text-gray-900 rounded-3xl p-8 sm:p-12 max-w-lg w-11/12 text-center shadow-2xl transform scale-90 transition-transform duration-300 border-4 border-yellow-400">
+            <div class="text-7xl mb-4 animate-bounce">⏰</div>
+            <h2 class="text-3xl sm:text-4xl font-black text-gray-900 mb-2">활동 시간 종료!</h2>
+            <p class="text-xl text-gray-600 mb-8 font-bold">모둠 활동을 마무리학고 발표를 준비해 주세요.</p>
+            <button onclick="closeModal()" class="btn-push w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-2xl py-4 rounded-2xl shadow-lg">
+                확인 및 닫기
+            </button>
+        </div>
+    </div>
+
+    <!-- JavaScript 로직 -->
+    <script>
+        // 변수 상태 관리
+        let totalTime = 300;     // 설정된 총 시간 (초 단위, 기본 5분)
+        let timeRemaining = 300; // 남은 시간 (초 단위)
+        let timerInterval = null;
+        let isRunning = false;
+        let audioCtx = null;
+
+        // DOM Element 참조
+        const timerDisplay = document.getElementById('timer-display');
+        const startBtn = document.getElementById('start-btn');
+        const startBtnIcon = document.getElementById('start-btn-icon');
+        const startBtnText = document.getElementById('start-btn-text');
+        const progressBar = document.getElementById('progress-bar');
+        const statusBadge = document.getElementById('status-badge');
+        const currentTimeEl = document.getElementById('current-time');
+        const characterContainer = document.getElementById('character-container');
+        const finishModal = document.getElementById('finish-modal');
+
+        // SVG 눈, 입, 땀 요소들
+        const eyesHappy = document.getElementById('eyes-happy');
+        const eyesNervous = document.getElementById('eyes-nervous');
+        const eyesPanicked = document.getElementById('eyes-panicked');
+        const eyesDead = document.getElementById('eyes-dead');
+
+        const mouthHappy = document.getElementById('mouth-happy');
+        const mouthNervous = document.getElementById('mouth-nervous');
+        const mouthPanicked = document.getElementById('mouth-panicked');
+        const mouthDead = document.getElementById('mouth-dead');
+
+        const sweatSmall = document.getElementById('sweat-small');
+        const sweatLarge = document.getElementById('sweat-large');
+
+        // 초기 화면 업데이트
+        updateDisplay();
+        updateCurrentClock();
+        setInterval(updateCurrentClock, 1000);
+
+        // 시계 디스플레이 포맷 (MM:SS)
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+
+        // 현재 시각 표시 (Header)
+        function updateCurrentClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            currentTimeEl.textContent = `${hours}:${minutes}:${seconds}`;
+        }
+
+        // 타이머 수치 및 UI/테마 전체 갱신
+        function updateDisplay() {
+            timerDisplay.textContent = formatTime(timeRemaining);
+            
+            // 진행률 계산
+            const ratio = totalTime > 0 ? (timeRemaining / totalTime) : 0;
+            progressBar.style.width = `${Math.max(0, Math.min(100, ratio * 100))}%`;
+
+            // 신호등 배경 테마 & 캐릭터 표정 조절
+            document.body.classList.remove('theme-green', 'theme-yellow', 'theme-red', 'theme-finish', 'flash-bg');
+            characterContainer.classList.remove('animate-shake', 'animate-jump');
+
+            // 캐릭터 SVG 파트 가시성 초기화
+            [eyesHappy, eyesNervous, eyesPanicked, eyesDead].forEach(el => el.classList.add('hidden'));
+            [mouthHappy, mouthNervous, mouthPanicked, mouthDead].forEach(el => el.classList.add('hidden'));
+            [sweatSmall, sweatLarge].forEach(el => el.classList.add('hidden'));
+
+            if (timeRemaining <= 0) {
+                // 종료 상태
+                document.body.classList.add('theme-finish', 'flash-bg');
+                characterContainer.classList.add('animate-jump');
+                eyesDead.classList.remove('hidden');
+                mouthDead.classList.remove('hidden');
+                sweatLarge.classList.remove('hidden');
+                statusBadge.textContent = "⏰ 시간이 모두 종료되었습니다!";
+            } else if (ratio > 0.5) {
+                // 초록 테마 (50% 초과) - 여유로움
+                document.body.classList.add('theme-green');
+                eyesHappy.classList.remove('hidden');
+                mouthHappy.classList.remove('hidden');
+                statusBadge.textContent = "🌱 차분하게 모둠 활동을 진행하세요.";
+            } else if (ratio > 0.2) {
+                // 노랑/주황 테마 (20% ~ 50%) - 집중 및 주의
+                document.body.classList.add('theme-yellow');
+                eyesNervous.classList.remove('hidden');
+                mouthNervous.classList.remove('hidden');
+                sweatSmall.classList.remove('hidden');
+                statusBadge.textContent = "💡 남은 시간을 확인하고 서둘러주세요!";
+            } else {
+                // 빨강 테마 (20% 이하) - 긴박함
+                document.body.classList.add('theme-red');
+                characterContainer.classList.add('animate-shake');
+                eyesPanicked.classList.remove('hidden');
+                mouthPanicked.classList.remove('hidden');
+                sweatLarge.classList.remove('hidden');
+                statusBadge.textContent = "🔥 거의 다 되었어요! 마무리를 준비하세요!";
+            }
+        }
+
+        // 시작 / 일시정지 토글
+        function toggleTimer() {
+            if (isRunning) {
+                pauseTimer();
+            } else {
+                if (timeRemaining <= 0) return;
+                startTimer();
+            }
+        }
+
+        function startTimer() {
+            isRunning = true;
+            startBtnIcon.textContent = "❚❚";
+            startBtnText.textContent = "일시정지";
+            startBtn.classList.replace('bg-white', 'bg-yellow-300');
+            startBtn.classList.replace('text-emerald-800', 'text-yellow-900');
+
+            timerInterval = setInterval(() => {
+                if (timeRemaining > 0) {
+                    timeRemaining--;
+                    updateDisplay();
+                } else {
+                    onTimerFinished();
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            isRunning = false;
+            clearInterval(timerInterval);
+            startBtnIcon.textContent = "▶";
+            startBtnText.textContent = "시작";
+            startBtn.classList.replace('bg-yellow-300', 'bg-white');
+            startBtn.classList.replace('text-yellow-900', 'text-emerald-800');
+        }
+
+        function resetTimer() {
+            pauseTimer();
+            timeRemaining = totalTime;
+            updateDisplay();
+        }
+
+        // 프리셋 버튼 설정
+        function setPresetTime(seconds) {
+            pauseTimer();
+            totalTime = seconds;
+            timeRemaining = seconds;
+            updateDisplay();
+        }
+
+        // 시간 추가/감소 (+10초, -1분 등)
+        function addTime(seconds) {
+            timeRemaining = Math.max(0, timeRemaining + seconds);
+            if (timeRemaining > totalTime) {
+                totalTime = timeRemaining;
+            }
+            updateDisplay();
+        }
+
+        // 타이머 종료 이벤트 처리
+        function onTimerFinished() {
+            pauseTimer();
+            updateDisplay();
+            playAlarmSound();
+            showModal();
+        }
+
+        // Web Audio API를 사용한 맑고 또렷한 알람 소리 생성
+        function playAlarmSound() {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                // 4연속 띵동음 생성
+                const playBeep = (freq, startTime, duration) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, startTime);
+
+                    gain.gain.setValueAtTime(0.3, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    osc.start(startTime);
+                    osc.stop(startTime + duration);
+                };
+
+                const now = audioCtx.currentTime;
+                // 두 차례 비프음 연주
+                playBeep(523.25, now, 0.2);       // C5
+                playBeep(659.25, now + 0.15, 0.2); // E5
+                playBeep(783.99, now + 0.3, 0.2);  // G5
+                playBeep(1046.50, now + 0.45, 0.5); // C6
+
+                playBeep(523.25, now + 0.9, 0.2);
+                playBeep(659.25, now + 1.05, 0.2);
+                playBeep(783.99, now + 1.2, 0.2);
+                playBeep(1046.50, now + 1.35, 0.6);
+            } catch (e) {
+                console.log("Audio play error:", e);
+            }
+        }
+
+        // 모달 열기 및 닫기
+        function showModal() {
+            finishModal.classList.remove('hidden');
+            setTimeout(() => {
+                finishModal.classList.remove('opacity-0');
+                finishModal.querySelector('div').classList.remove('scale-90');
+                finishModal.querySelector('div').classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            finishModal.classList.add('opacity-0');
+            finishModal.querySelector('div').classList.remove('scale-100');
+            finishModal.querySelector('div').classList.add('scale-90');
+            setTimeout(() => {
+                finishModal.classList.add('hidden');
+            }, 300);
+        }
+
+        // 디스플레이 직접 클릭 시에도 일시정지/시작 동작 가능
+        timerDisplay.addEventListener('click', toggleTimer);
+    </script>
+</body>
+</html>
